@@ -1,0 +1,86 @@
+<?php
+session_start();
+include('db_connect.php');
+
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = array();
+}
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if (isset($_POST['productName']) && isset($_POST['quantity'])) {
+        $productName = $_POST['productName'];
+        $quantity = $_POST['quantity'];
+
+        
+        if (isset($_SESSION['cart'][$productName])) {
+            $_SESSION['cart'][$productName] += $quantity;
+        } else {
+            $_SESSION['cart'][$productName] = $quantity;
+        }
+    }
+}
+
+
+if (isset($_POST['checkout'])) {
+    foreach ($_SESSION['cart'] as $product => $quantity) {
+       
+        $sql_insert = "INSERT INTO history (product_name, quantity) VALUES ('$product', '$quantity')";
+        mysqli_query($conn, $sql_insert);
+
+        
+        $sql_update = "UPDATE inventory SET quantity = quantity - $quantity WHERE product_name = '$product'";
+        mysqli_query($conn, $sql_update);
+    }
+   
+    $_SESSION['cart'] = array();
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS</title>
+    <style>
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Point of Sale</h2>
+        <div id="productInput">
+            <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
+                <label for="productName">Product Name:</label>
+                <input type="text" id="productName" name="productName" required>
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" name="quantity" min="1" value="1" required>
+                <button type="submit">Add to Cart</button>
+            </form>
+        </div>
+        <div id="cart">
+            <h3>Cart</h3>
+            <ul id="cart-items">
+                <?php
+                $totalPrice = 0;
+                // Display cart items and calculate total price for each item
+                foreach ($_SESSION['cart'] as $product => $quantity) {
+                    $sql_price = "SELECT price FROM inventory WHERE product_name = '$product'";
+                    $result_price = mysqli_query($conn, $sql_price);
+                    $row = mysqli_fetch_assoc($result_price);
+                    $price = $row['price'];
+                    $totalItemPrice = $price * $quantity;
+                    echo "<li>$product - Quantity: $quantity - Total Price: $totalItemPrice</li>";
+                    $totalPrice += $totalItemPrice;
+                }
+                ?>
+            </ul>
+            <div id="total">Total: $<?php echo number_format($totalPrice, 2); ?></div>
+            <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
+                <input type="hidden" name="checkout" value="1">
+                <button type="submit">Checkout</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
